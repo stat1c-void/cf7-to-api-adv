@@ -210,7 +210,7 @@ use correct query delimeters like ? and &.', 'qs-cf7-api') ?>
     public function qs_save_contact_form_details($contact_form)
     {
         $properties = $contact_form->get_properties();
-        $properties['wpcf7_api_data'] = $_POST["wpcf7-sf"];
+        $properties['wpcf7_api_data'] = $_POST['wpcf7-sf'];
         $contact_form->set_properties($properties);
     }
 
@@ -221,16 +221,13 @@ use correct query delimeters like ? and &.', 'qs-cf7-api') ?>
      */
     public function qs_cf7_send_data_to_api($WPCF7_ContactForm)
     {
-        $submission = WPCF7_Submission::get_instance();
-
-        $url = $submission->get_meta('url');
-
         $qs_cf7_data = $WPCF7_ContactForm->prop('wpcf7_api_data');
 
         /* check if the form is marked to be sent via API */
-        if (isset($qs_cf7_data["send_to_api"]) && $qs_cf7_data["send_to_api"]) {
+        if (isset($qs_cf7_data['send_to_api']) && $qs_cf7_data['send_to_api']) {
             $record = array();
-            $record["url"] = $qs_cf7_data["base_url"];
+            $record['url'] = $qs_cf7_data['base_url'];
+            $record['query_body'] = $qs_cf7_data['query_body'];
 
             if (isset($record["url"]) && $record["url"]) {
                 do_action('qs_cf7_api_before_sent_to_api', $record);
@@ -277,57 +274,41 @@ use correct query delimeters like ? and &.', 'qs-cf7-api') ?>
     {
         global $wp_version;
 
-        $lead = $record["fields"];
-        $url = $record["url"];
+        $url = $record['url'];
+        $query_body = $record['query_body'];
+        $args = array(
+            'timeout' => 15,
+            'redirection' => 5,
+            'httpversion' => '1.0',
+            'user-agent' => 'WordPress/' . $wp_version . '; ' . home_url(),
+            'blocking' => true,
+            'headers' => array(),
+            'cookies' => array(),
+            'body' => null,
+            'compress' => false,
+            'decompress' => true,
+            'sslverify' => true,
+            'stream' => false,
+            'filename' => null
+        );
 
         if ($method == 'GET') {
-            $args = array(
-                'timeout' => 5,
-                'redirection' => 5,
-                'httpversion' => '1.0',
-                'user-agent' => 'WordPress/' . $wp_version . '; ' . home_url(),
-                'blocking' => true,
-                'headers' => array(),
-                'cookies' => array(),
-                'body' => null,
-                'compress' => false,
-                'decompress' => true,
-                'sslverify' => true,
-                'stream' => false,
-                'filename' => null
-            );
-
             $args = apply_filters('qs_cf7_api_get_args', $args, $record);
-            $lead_string = http_build_query($lead);
-            $url = strpos('?', $url) ? $url . '&' . $lead_string : $url . '?' . $lead_string;
+            $url .= $query_body;
             $url = apply_filters('qs_cf7_api_get_url', $url, $record);
             $result = wp_remote_get($url, $args);
         } else {
-            $args = array(
-                'timeout' => 5,
-                'redirection' => 5,
-                'httpversion' => '1.0',
-                'user-agent' => 'WordPress/' . $wp_version . '; ' . home_url(),
-                'blocking' => true,
-                'headers' => array(),
-                'cookies' => array(),
-                'body' => $lead,
-                'compress' => false,
-                'decompress' => true,
-                'sslverify' => true,
-                'stream' => false,
-                'filename' => null
-            );
-
-            $args = apply_filters('qs_cf7_api_get_args', $args);
+            $args['body'] = $query_body;
+            $args = apply_filters('qs_cf7_api_post_args', $args);
             $url = apply_filters('qs_cf7_api_post_url', $url);
             $result = wp_remote_post($url, $args);
-            $result['body'] = strip_tags($result['body']);
         }
 
+        $result['body'] = strip_tags($result['body']);
+
         if ($debug) {
-            update_option('qs_cf7_api_debug_url', $record["url"]);
-            update_option('qs_cf7_api_debug_params', $lead);
+            update_option('qs_cf7_api_debug_url', $record['url']);
+            update_option('qs_cf7_api_debug_params', $query_body);
             update_option('qs_cf7_api_debug_result', $result);
         }
 
