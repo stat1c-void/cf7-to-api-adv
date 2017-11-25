@@ -5,6 +5,15 @@ if (!defined('WPINC')) {
     die;
 }
 
+function qs_cf7_notice_cf7_not_active() {
+    ?>
+    <div class="notice notice-warning">
+        <p><?php _e('"Contact Form 7 To API" integrations requires "Contact Form 7" plugin to be installed and active', 'qs-cf7-api'); ?></p>
+    </div>
+    <?php
+}
+
+
 class QS_CF7_api_admin
 {
     /**
@@ -26,7 +35,6 @@ class QS_CF7_api_admin
 
     public function __construct()
     {
-        $this->admin_notices = new QS_Admin_notices();
         $this->register_hooks();
     }
 
@@ -37,14 +45,7 @@ class QS_CF7_api_admin
     public function verify_dependencies()
     {
         if (!is_plugin_active('contact-form-7/wp-contact-form-7.php')) {
-            $notice = array(
-                'id' => 'cf7-not-active',
-                'type' => 'warning',
-                'notice' => __('Contact Form 7 To API integrations requires CONTACT FORM 7 Plugin to be installed and active', 'qs-cf7-api'),
-                'dismissable_forever' => false
-            );
-
-            $this->admin_notices->wp_add_notice($notice);
+            add_action('admin_notices', 'qs_cf7_notice_cf7_not_active');
         }
     }
 

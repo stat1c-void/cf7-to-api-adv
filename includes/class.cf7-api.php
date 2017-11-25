@@ -70,10 +70,7 @@ class QS_CF7_atp_integration
      */
     public function load_dependencies()
     {
-        // admin notices class
-        require_once QS_CF7_API_INCLUDES_PATH . 'class.qs-admin-notices.php';
-
-        // admin notices clclass
+        // admin main class
         require_once QS_CF7_API_INCLUDES_PATH . 'class-cf7-api-admin.php';
     }
 
