@@ -54,18 +54,12 @@ class QS_CF7_api_admin
      */
     public function register_hooks()
     {
-        /**
-         * Check if required plugins are active
-         * @var [type]
-         */
+        // Check if required plugins are active
         add_action('admin_init', array($this, 'verify_dependencies'));
-
         // before sending email to user actions
         add_action('wpcf7_before_send_mail', array($this, 'qs_cf7_send_data_to_api'));
-
         // adds another tab to contact form 7 screen
         add_filter("wpcf7_editor_panels", array($this, "add_integrations_tab"), 1, 1);
-
         // actions to handle while saving the form
         add_action("wpcf7_save_contact_form", array($this, "qs_save_contact_form_details"), 10, 1);
 
@@ -81,8 +75,6 @@ class QS_CF7_api_admin
     {
         //add mail tags to allowed properties
         $properties["wpcf7_api_data"] = isset($properties["wpcf7_api_data"]) ? $properties["wpcf7_api_data"] : array();
-        $properties["wpcf7_api_data_map"] = isset($properties["wpcf7_api_data_map"]) ? $properties["wpcf7_api_data_map"] : array();
-
         return $properties;
     }
 
@@ -109,13 +101,14 @@ class QS_CF7_api_admin
     function wpcf7_integrations($post)
     {
         $wpcf7_api_data = $post->prop('wpcf7_api_data');
-        $wpcf7_api_data_map = $post->prop('wpcf7_api_data_map');
 
         $mail_tags = apply_filters('qs_cf7_collect_mail_tags', $post->collect_mail_tags(array("exclude" => array("all-fields"))));
 
         $wpcf7_api_data["base_url"] = isset($wpcf7_api_data["base_url"]) ? $wpcf7_api_data["base_url"] : '';
-        $wpcf7_api_data["send_to_api"] = isset($wpcf7_api_data["send_to_api"]) ? $wpcf7_api_data["send_to_api"] : '';
+        $wpcf7_api_data["send_to_api"] = isset($wpcf7_api_data["send_to_api"]) ? $wpcf7_api_data["send_to_api"] : false;
+        $wpcf7_api_data["stop_email"] = isset($wpcf7_api_data["stop_email"]) ? $wpcf7_api_data["stop_email"] : false;
         $wpcf7_api_data["method"] = isset($wpcf7_api_data["method"]) ? $wpcf7_api_data["method"] : 'GET';
+        $wpcf7_api_data["query_body"] = isset($wpcf7_api_data["query_body"]) ? $wpcf7_api_data["query_body"] : '?foo=bar';
         $wpcf7_api_data["debug_log"] = isset($wpcf7_api_data["debug_log"]) ? $wpcf7_api_data["debug_log"] : false;
         $debug_url = get_option('qs_cf7_api_debug_url');
         $debug_result = get_option('qs_cf7_api_debug_result');
@@ -123,19 +116,26 @@ class QS_CF7_api_admin
         ?>
 
 
-        <h2><?php echo esc_html__('API Integration', 'qs-cf7-api'); ?></h2>
+        <h2><?php _e('API Integration', 'qs-cf7-api') ?></h2>
 
         <fieldset>
             <?php do_action('before_base_fields', $post); ?>
 
             <div class="cf7_row">
-
                 <label for="wpcf7-sf-send_to_api">
                     <input type="checkbox" id="wpcf7-sf-send_to_api"
-                           name="wpcf7-sf[send_to_api]" <?php checked($wpcf7_api_data["send_to_api"], "on"); ?>/>
-                    <?php _e('Send to api ?', 'qs-cf7-api'); ?>
+                           name="wpcf7-sf[send_to_api]" <?php checked($wpcf7_api_data["send_to_api"]) ?>/>
+                    <?php _e('Send to API', 'qs-cf7-api') ?>
                 </label>
+            </div>
 
+            <div class="cf7_row">
+                <label for="wpcf7-sf-stop_email">
+                    <input type="checkbox" id="wpcf7-sf-stop_email"
+                           name="wpcf7-sf[stop_email]" <?php checked($wpcf7_api_data["stop_email"]) ?>/>
+                    <?php _e('Do not send an e-mail', 'qs-cf7-api') ?>
+                </label>
+                <p class="description"><?php _e('If enabled, e-mails would not be sent upon form submission.') ?></p>
             </div>
 
             <div class="cf7_row">
@@ -149,60 +149,56 @@ class QS_CF7_api_admin
             <div class="cf7_row">
                 <label for="wpcf7-sf-method">
                     <?php _e('Method', 'qs-cf7-api'); ?>
-                    <select id="wpcf7-sf-base_url" name="wpcf7-sf[method]">
+                    <select id="wpcf7-sf-method" name="wpcf7-sf[method]">
                         <option value="GET" <?php selected($wpcf7_api_data["method"], 'GET'); ?>>GET</option>
                         <option value="POST" <?php selected($wpcf7_api_data["method"], 'POST'); ?>>POST</option>
                     </select>
                 </label>
             </div>
 
+            <div class="cf7_row">
+                <label for="wpcf7-sf-debug_log">
+                    <input type="checkbox" id="wpcf7-sf-debug_log"
+                           name="wpcf7-sf[debug_log]" <?php checked($wpcf7_api_data["debug_log"]) ?>/>
+                    <?php _e('Debug log', 'qs-cf7-api'); ?>
+                </label>
+                <p class="description"><?php _e('If enabled, last API call result would be saved and displayed on this page below.') ?></p>
+            </div>
+
             <?php do_action('after_base_fields', $post); ?>
         </fieldset>
 
-        <h2><?php echo esc_html__('Form fields', 'qs-cf7-api'); ?></h2>
+        <h2><?php _e('Query Body', 'qs-cf7-api') ?></h2>
 
         <fieldset>
-            <table>
-                <tr>
-                    <th><?php _e('Form fields', 'qs-cf7-api'); ?></th>
-                    <th><?php _e('API Key', 'qs-cf7-api'); ?></th>
-                </tr>
+            <legend><?php esc_html_e('If you use GET method, query body will be appended to the URL and url-encoded, \
+use correct query delimeters like ? and &.', 'qs-cf7-api') ?>
+                <br />
+                <?php esc_html_e('You can use the following template tags:') ?><br />
+                [<?php echo join('], [', $mail_tags) ?>]
+            </legend>
 
-                <?php foreach ($mail_tags as $mail_tag) : ?>
-
-                    <tr>
-                        <th style="text-align:left;"><?php echo $mail_tag; ?></th>
-                        <td><input type="text" id="sf-<?php echo $mail_tag; ?>"
-                                   name="qs_wpcf7_api_map[<?php echo $mail_tag; ?>]" class="large-text"
-                                   value="<?php echo isset($wpcf7_api_data_map[$mail_tag]) ? $wpcf7_api_data_map[$mail_tag] : ""; ?>"/>
-                        </td>
-                    </tr>
-
-                <?php endforeach; ?>
-
-            </table>
-
-            <label>
-                <input type="checkbox" value="1"
-                       name="wpcf7-sf[debug_log]" <?php checked($wpcf7_api_data['debug_log'], '1'); ?> />
-                <?php _e('DEBUG LOG', 'qs-cf7-api'); ?>
-            </label>
-
-            <?php if ($wpcf7_api_data['debug_log']): ?>
-            <h3 class="debug_log_title"><?php _e('LAST API CALL', 'qs-cf7-api'); ?></h3>
-
-            <div class="debug_log">
-                <h4><?php _e('Called url', 'qs-cf7-api'); ?>:</h4>
-                <pre><?php echo trim(esc_attr($debug_url)); ?></pre>
-                <h4><?php _e('Params', 'qs-cf7-api'); ?>:</h4>
-                <pre><?php print_r($debug_params); ?></pre>
-                <h4><?php _e('Remote server result', 'qs-cf7-api'); ?>:</h4>
-                <pre><?php print_r($debug_result); ?></pre>
+            <div class="cf7_row">
+                <textarea id="wpcf7-sf-query_body" name="wpcf7-sf[query_body]" cols="100" rows="4"
+                    class="large-text code"><?php echo esc_html($wpcf7_api_data["query_body"]) ?></textarea>
             </div>
-                <?php endif; ?>
         </fieldset>
 
-        <?php
+        <?php if ($wpcf7_api_data['debug_log']): ?>
+        <fieldset>
+            <h3 class="debug_log_title"><?php _e('LAST API CALL', 'qs-cf7-api') ?></h3>
+
+            <div class="debug_log">
+                <h4><?php _e('Called URL', 'qs-cf7-api') ?>:</h4>
+                <pre><?php echo trim(esc_attr($debug_url)) ?></pre>
+                <h4><?php _e('Params', 'qs-cf7-api') ?>:</h4>
+                <pre><?php print_r($debug_params) ?></pre>
+                <h4><?php _e('Remote server result', 'qs-cf7-api') ?>:</h4>
+                <pre><?php print_r($debug_result) ?></pre>
+            </div>
+        </fieldset>
+        <?php endif;
+
     }
 
     /**
@@ -214,7 +210,6 @@ class QS_CF7_api_admin
     {
         $properties = $contact_form->get_properties();
         $properties['wpcf7_api_data'] = $_POST["wpcf7-sf"];
-        $properties['wpcf7_api_data_map'] = $_POST["qs_wpcf7_api_map"];
         $contact_form->set_properties($properties);
     }
 
@@ -230,11 +225,10 @@ class QS_CF7_api_admin
         $url = $submission->get_meta('url');
 
         $qs_cf7_data = $WPCF7_ContactForm->prop('wpcf7_api_data');
-        $qs_cf7_data_map = $WPCF7_ContactForm->prop('wpcf7_api_data_map');
 
         /* check if the form is marked to be sent via API */
-        if (isset($qs_cf7_data["send_to_api"]) && $qs_cf7_data["send_to_api"] == "on") {
-            $record = $this->get_record($submission, $qs_cf7_data_map);
+        if (isset($qs_cf7_data["send_to_api"]) && $qs_cf7_data["send_to_api"]) {
+            $record = array();
             $record["url"] = $qs_cf7_data["base_url"];
 
             if (isset($record["url"]) && $record["url"]) {
