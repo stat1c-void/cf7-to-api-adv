@@ -70,9 +70,6 @@ class QS_CF7_atp_integration
      */
     public function load_dependencies()
     {
-        // General global plugin functions
-        require_once QS_CF7_API_INCLUDES_PATH . 'class.cf7-helpers.php';
-
         // admin notices class
         require_once QS_CF7_API_INCLUDES_PATH . 'class.qs-admin-notices.php';
 
