@@ -198,7 +198,7 @@ class QS_CF7_api_admin
                 <pre><?php print_r($debug_params); ?></pre>
                 <h4><?php _e('Remote server result', 'qs-cf7-api'); ?>:</h4>
                 <pre><?php print_r($debug_result); ?></pre>
-                </textarea>
+            </div>
                 <?php endif; ?>
         </fieldset>
 
