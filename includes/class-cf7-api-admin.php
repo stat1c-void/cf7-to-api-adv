@@ -109,6 +109,7 @@ class QS_CF7_api_admin
         $wpcf7_api_data["send_to_api"] = isset($wpcf7_api_data["send_to_api"]) ? !!$wpcf7_api_data["send_to_api"] : false;
         $wpcf7_api_data["stop_email"] = isset($wpcf7_api_data["stop_email"]) ? !!$wpcf7_api_data["stop_email"] : false;
         $wpcf7_api_data["method"] = isset($wpcf7_api_data["method"]) ? $wpcf7_api_data["method"] : 'GET';
+        $wpcf7_api_data["query_headers"] = isset($wpcf7_api_data["query_headers"]) ? $wpcf7_api_data["query_headers"] : '';
         $wpcf7_api_data["query_body"] = isset($wpcf7_api_data["query_body"]) ? $wpcf7_api_data["query_body"] : '?foo=bar';
         $wpcf7_api_data["debug_log"] = isset($wpcf7_api_data["debug_log"]) ? !!$wpcf7_api_data["debug_log"] : false;
 
@@ -137,7 +138,7 @@ class QS_CF7_api_admin
                            name="wpcf7-sf[stop_email]" <?php checked($wpcf7_api_data["stop_email"]) ?>/>
                     <?php _e('Do not send an e-mail', 'qs-cf7-api') ?>
                 </label>
-                <p class="description"><?php _e('If enabled, e-mails would not be sent upon form submission.') ?></p>
+                <p class="description"><?php _e('If enabled, e-mails will not be sent upon form submission.') ?></p>
             </div>
 
             <div class="cf7_row">
@@ -170,19 +171,35 @@ class QS_CF7_api_admin
             <?php do_action('after_base_fields', $post); ?>
         </fieldset>
 
-        <h2><?php _e('Query Body', 'qs-cf7-api') ?></h2>
+        <h2><?php _e('Query Parameters', 'qs-cf7-api') ?></h2>
 
         <fieldset>
-            <legend><?php esc_html_e('If you use GET method, query body will be appended to the URL and url-encoded, use correct query delimeters like ? and &.', 'qs-cf7-api') ?>
-                <br />
-                <?php esc_html_e('You can use the following template tags:') ?><br />
-                [<?php echo join('], [', $mail_tags) ?>]
-            </legend>
+            <div class="cf7_row">
+                <label for="wpcf7-sf-query_headers">
+                    <?php _e('Query headers', 'qs-cf7-api') ?>
+                    <textarea id="wpcf7-sf-query_headers" name="wpcf7-sf[query_headers]" cols="100" rows="4"
+                        class="large-text code"><?php echo esc_html($wpcf7_api_data["query_headers"]) ?></textarea>
+                </label>
+            </div>
+
+            <p class="description">
+                <?php esc_html_e('Newline-delimited HTTP headers, usual HTTP format, e.g. Header: Header-Content.', 'qs-cf7-api') ?>
+            </p>
 
             <div class="cf7_row">
-                <textarea id="wpcf7-sf-query_body" name="wpcf7-sf[query_body]" cols="100" rows="8"
-                    class="large-text code"><?php echo esc_html($wpcf7_api_data["query_body"]) ?></textarea>
+                <label for="wpcf7-sf-query_body">
+                    <?php _e('Query body', 'qs-cf7-api') ?>
+                    <textarea id="wpcf7-sf-query_body" name="wpcf7-sf[query_body]" cols="100" rows="8"
+                        class="large-text code"><?php echo esc_html($wpcf7_api_data["query_body"]) ?></textarea>
+                </label>
             </div>
+
+            <p class="description">
+                <?php esc_html_e('If you use GET method, query body will be appended to the URL, use correct query delimeters like ? and &.', 'qs-cf7-api') ?>
+                <br />
+                <?php esc_html_e('You can use the following template tags (content will be url-encoded, dangerous characters stripped):') ?><br />
+                [<?php echo join(']&nbsp;&nbsp;[', $mail_tags) ?>]
+            </p>
         </fieldset>
 
         <?php if ($wpcf7_api_data['debug_log']): ?>
@@ -228,6 +245,7 @@ class QS_CF7_api_admin
             $record = array();
             $record['url'] = $qs_cf7_data['base_url'];
             $record['query_body'] = $qs_cf7_data['query_body'];
+            $record['query_headers'] = $qs_cf7_data['query_headers'];
 
             if (isset($record["url"]) && $record["url"]) {
                 do_action('qs_cf7_api_before_sent_to_api', $record);
@@ -276,10 +294,11 @@ class QS_CF7_api_admin
 
         $url = $record['url'];
         $query_body = $record['query_body'];
+
         $args = array(
             'timeout' => 15,
             'redirection' => 5,
-            'httpversion' => '1.0',
+            'httpversion' => '1.1',
             'user-agent' => 'WordPress/' . $wp_version . '; ' . home_url(),
             'blocking' => true,
             'headers' => array(),
@@ -291,6 +310,16 @@ class QS_CF7_api_admin
             'stream' => false,
             'filename' => null
         );
+
+        // Query headers processing
+        $query_headers = $record['query_headers'];
+        if ($query_headers) {
+            preg_match_all('/([[:graph:]]+)\s*:\s*([[:graph:] ]+)\s*/', $query_headers, $matches, PREG_SET_ORDER);
+
+            foreach ($matches as $match) {
+                $args['headers'][$match[1]] = $match[2];
+            }
+        }
 
         if ($method == 'GET') {
             $args = apply_filters('qs_cf7_api_get_args', $args, $record);
@@ -304,11 +333,12 @@ class QS_CF7_api_admin
             $result = wp_remote_post($url, $args);
         }
 
-        $result['body'] = strip_tags($result['body']);
+        if (!is_wp_error($result))
+            $result['body'] = strip_tags($result['body']);
 
         if ($debug) {
             update_option('qs_cf7_api_debug_url', $record['url']);
-            update_option('qs_cf7_api_debug_params', $query_body);
+            update_option('qs_cf7_api_debug_params', $args);
             update_option('qs_cf7_api_debug_result', $result);
         }
 
