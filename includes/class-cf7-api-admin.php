@@ -248,7 +248,7 @@ class WPCF7_api_adv_admin
         // Iterating submitted form data
         foreach ($submitted_data as $key => $value) {
             // Safety stripping and url-encoding
-            $value = preg_replace('/[[:punct:]]/', ' ', $value);
+            $value = preg_replace('/\s*[\[\]{}\/\\\\|]+\s*/', ' ', $value);
             $value = urlencode($value);
             // Replacing query_body tags with content
             $query_body = preg_replace("/\[$key\]/i", $value, $query_body);
