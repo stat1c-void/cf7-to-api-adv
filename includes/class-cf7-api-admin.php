@@ -233,8 +233,6 @@ class QS_CF7_api_admin
 
     /**
      * The handler that will send the data to the api
-     * @param  [type] $WPCF7_ContactForm [description]
-     * @return [type]                    [description]
      */
     public function qs_cf7_send_data_to_api($WPCF7_ContactForm)
     {
@@ -244,7 +242,7 @@ class QS_CF7_api_admin
         if (isset($qs_cf7_data['send_to_api']) && $qs_cf7_data['send_to_api']) {
             $record = array();
             $record['url'] = $qs_cf7_data['base_url'];
-            $record['query_body'] = $qs_cf7_data['query_body'];
+            $record['query_body'] = $this->process_query_body(WPCF7_Submission::get_instance(), $qs_cf7_data['query_body']);
             $record['query_headers'] = $qs_cf7_data['query_headers'];
 
             if (isset($record["url"]) && $record["url"]) {
@@ -256,29 +254,22 @@ class QS_CF7_api_admin
     }
 
     /**
-     * Convert the form keys to the API keys according to the mapping instructions
-     * @param  [type] $submission      [description]
-     * @param  [type] $qs_cf7_data_map [description]
-     * @return [type]                  [description]
+     * Processes the query body - replace form tags with content
      */
-    function get_record($submission, $qs_cf7_data_map)
+    function process_query_body($submission, $query_body)
     {
-        $submited_data = $submission->get_posted_data();
-        $record = array();
+        $submitted_data = $submission->get_posted_data();
 
-        foreach ($qs_cf7_data_map as $form_key => $qs_cf7_form_key) {
-            if ($qs_cf7_form_key) {
-                $value = isset($submited_data[$form_key]) ? $submited_data[$form_key] : "";
-
-                if (is_array($value)) {
-                    $record["fields"][$qs_cf7_form_key] = $value ? true : false;
-                } else {
-                    $record["fields"][$qs_cf7_form_key] = apply_filters('set_record_value', $value, $qs_cf7_form_key);
-                }
-            }
+        // Iterating submitted form data
+        foreach ($submitted_data as $key => $value) {
+            // Safety stripping and url-encoding
+            $value = preg_replace('/[[:punct:]]/', ' ', $value);
+            $value = urlencode($value);
+            // Replacing query_body tags with content
+            $query_body = preg_replace("/\[$key\]/i", $value, $query_body);
         }
 
-        return $record;
+        return $query_body;
     }
 
     /**
@@ -323,7 +314,7 @@ class QS_CF7_api_admin
 
         if ($method == 'GET') {
             $args = apply_filters('qs_cf7_api_get_args', $args, $record);
-            $url .= urlencode($query_body);
+            $url .= $query_body;
             $url = apply_filters('qs_cf7_api_get_url', $url, $record);
             $result = wp_remote_get($url, $args);
         } else {
@@ -337,7 +328,7 @@ class QS_CF7_api_admin
             $result['body'] = strip_tags($result['body']);
 
         if ($debug) {
-            update_option('qs_cf7_api_debug_url', $record['url']);
+            update_option('qs_cf7_api_debug_url', $url);
             update_option('qs_cf7_api_debug_params', $args);
             update_option('qs_cf7_api_debug_result', $result);
         }
