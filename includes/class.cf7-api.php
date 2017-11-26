@@ -4,7 +4,7 @@ if (!defined('WPINC')) {
     die;
 }
 
-class QS_CF7_atp_integration
+class WPCF7_api_adv
 {
     /**
      * The plugin identifier.
@@ -34,15 +34,6 @@ class QS_CF7_atp_integration
     public $admin;
 
     /**
-     * a reference to the plugin status .
-     *
-     * @since    1.0.0
-     * @access   protected
-     * @var      object $admin an instance of the admin class.
-     */
-    private $woocommerce_is_active;
-
-    /**
      * Define the plugin functionality.
      * set plugin name and version , and load dependencies
      *
@@ -50,12 +41,12 @@ class QS_CF7_atp_integration
      */
     public function __construct()
     {
-        $this->plugin_name = 'wc-qs-wishlist';
+        $this->plugin_name = 'wpcf7-api-adv';
         $this->version = '1.0.0';
         $this->load_dependencies();
 
         // Create an instance of the admin class
-        $this->admin = new QS_CF7_api_admin();
+        $this->admin = new WPCF7_api_adv_admin();
         $this->admin->plugin_name = $this->plugin_name;
 
         // save the instance for static actions
@@ -66,17 +57,15 @@ class QS_CF7_atp_integration
 
     /**
      * Loads the required plugin files
-     * @return [type] [description]
      */
     public function load_dependencies()
     {
         // admin main class
-        require_once QS_CF7_API_INCLUDES_PATH . 'class-cf7-api-admin.php';
+        require_once WPCF7_API_ADV_INCLUDES_PATH . 'class-cf7-api-admin.php';
     }
 
     /**
      * Get the current plugin instance
-     * @return [type] [description]
      */
     public static function get_instance()
     {
