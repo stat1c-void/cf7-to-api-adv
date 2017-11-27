@@ -235,6 +235,21 @@ class WPCF7_api_adv_admin
                 $response = $this->send_lead($record, $wpcf7_data['debug_log'], $wpcf7_data['method']);
                 do_action('wpcf7_api_adv_after_sent_to_api', $record, $response);
             }
+
+            // Skip sending mail if needed
+            if ($wpcf7_data['stop_email']) {
+                add_filter('wpcf7_skip_mail', '__return_true');
+            }
+
+            // If API call resulted in error
+            if (is_wp_error($response)) {
+                // Change the output message to an error
+                // We need this because skipped mail always succeeds
+                // Because sending mail is the last step, we can be sure that no validation errors, etc are overwritten
+                // And if mail is not skipped, form still fails if API call fails
+                add_filter('wpcf7_form_response_output', array($this, 'wpcf7_form_response_to_error'), 10, 4);
+                add_filter('wpcf7_ajax_json_echo', array($this, 'wpcf7_rest_create_feedback_to_error'), 10, 2);
+            }
         }
     }
 
@@ -308,8 +323,9 @@ class WPCF7_api_adv_admin
             $result = wp_remote_post($url, $args);
         }
 
-        if (!is_wp_error($result))
+        if (!is_wp_error($result)) {
             $result['body'] = strip_tags($result['body']);
+        }
 
         if ($debug) {
             update_option('wpcf7_api_adv_debug_url', $url);
@@ -317,6 +333,34 @@ class WPCF7_api_adv_admin
             update_option('wpcf7_api_adv_debug_result', $result);
         }
 
-        return do_action('after_wpcf7_api_adv_send_lead', $result, $record);
+        return $result;
+    }
+
+    /*
+     * Filter function for wpcf7_form_response_output.
+     * Changes output to a generic error (fallback POST submit).
+     */
+    public function wpcf7_form_response_to_error($output, $class, $content, $WPCF7_ContactForm)
+    {
+        // Code here taken from WPCF7_ContactForm::form_response_output()
+        $attrs = array(
+            'class' => 'wpcf7-response-output wpcf7-mail-sent-ng',
+            'role'  => 'alert',
+        );
+        $attrs = wpcf7_format_atts($attrs);
+        $content = $WPCF7_ContactForm->message('mail_sent_ng');
+        return sprintf('<div %1$s>%2$s</div>', $attrs, esc_html($content));
+    }
+
+    /*
+     * Filter function for wpcf7_ajax_json_echo.
+     * Changes output to a generic error (AJAX WP REST API).
+     */
+    public function wpcf7_rest_create_feedback_to_error($response, $result)
+    {
+        $response['status'] = 'mail_sent_ng';
+        $WPCF7_ContactForm = WPCF7_ContactForm::get_current();
+        $response['message'] = $WPCF7_ContactForm->message($response['status']);
+        return $response;
     }
 }
